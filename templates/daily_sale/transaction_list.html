@@ -1,0 +1,372 @@
+{% extends "daily_sale/daily_sale_base.html" %}
+{% load humanize %}
+{% load static %}
+
+{% block title %}Almuqbil | Transaction List{% endblock %}
+
+{% block content %}
+<div class="row mb-3">
+  <div class="excel-menu">
+    <a href="{% url 'daily_sale:transaction_create' %}" class="menu-item">
+      <i class="fas fa-plus-circle"></i> New Transaction
+    </a>
+    <a href="{% url 'daily_sale:daily_summary' %}" class="menu-item">
+      <i class="fas fa-chart-bar"></i> Daily Summary
+    </a>
+  </div>
+  
+  <div class="col-md-8 mt-2">
+    <div class="d-flex align-items-center text-dark">
+      <span class="me-2">Search:</span>
+      <span class="filter-badge" data-filter="today">Today</span>
+      <span class="filter-badge" data-filter="week">This Week</span>
+      <span class="filter-badge" data-filter="month">This Month</span>
+      <span class="filter-badge" data-filter="paid">Paid</span>
+      <span class="filter-badge" data-filter="unpaid">Unpaid</span>
+      <span class="filter-badge" data-filter="partial">Partial</span>
+    </div>
+  </div>
+  <div class="col-md-4 mt-2">
+    <div class="position-relative search-box">
+      <input type="text" id="search-input" class="form-control search-input"
+        placeholder="Search by invoice, customer, code...">
+      <i class="bi bi-x-circle clear-search" id="clear-search" style="display: none; cursor: pointer;"></i>
+    </div>
+  </div>
+</div>
+
+<!-- کارت‌های آماری -->
+<div class="row mb-4">
+  <div class="col-xl-3 col-md-6 mb-4">
+    <div class="card summary-card border-left-primary shadow-sm h-100 py-2">
+      <div class="card-body">
+        <div class="row no-gutters align-items-center">
+          <div class="col mr-2">
+            <div class="text-xs font-weight-bold text-primary text-uppercase mb-1">
+              Total Transactions
+            </div>
+            <div class="h5 mb-0 font-weight-bold text-gray-800">
+              {{ stats.transaction_count|default:0|intcomma }}
+            </div>
+          </div>
+          <div class="col-auto">
+            <i class="bi bi-receipt fa-2x text-gray-300"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-xl-3 col-md-6 mb-4">
+    <div class="card summary-card border-left-success shadow-sm h-100 py-2">
+      <div class="card-body">
+        <div class="row no-gutters align-items-center">
+          <div class="col mr-2">
+            <div class="text-xs font-weight-bold text-success text-uppercase mb-1">
+              Net Sales
+            </div>
+            <div class="h6 mb-0 font-weight-bold text-gray-800">
+              AED {{ stats.net_total|default:0|floatformat:0|intcomma }}
+            </div>
+          </div>
+          <div class="col-auto">
+            <i class="bi bi-cash-stack fa-2x text-gray-300"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-xl-3 col-md-6 mb-4">
+    <div class="card summary-card border-left-info shadow-sm h-100 py-2">
+      <div class="card-body">
+        <div class="row no-gutters align-items-center">
+          <div class="col mr-2">
+            <div class="text-xs font-weight-bold text-info text-uppercase mb-1">
+              Total Paid
+            </div>
+            <div class="h6 mb-0 font-weight-bold text-gray-800">
+              AED {{ stats.total_paid|default:0|floatformat:0|intcomma }}
+            </div>
+          </div>
+          <div class="col-auto">
+            <i class="bi bi-credit-card fa-2x text-gray-300"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-xl-3 col-md-6 mb-4">
+    <div class="card summary-card border-left-warning shadow-sm h-100 py-2">
+      <div class="card-body">
+        <div class="row no-gutters align-items-center">
+          <div class="col mr-2">
+            <div class="text-xs font-weight-bold text-warning text-uppercase mb-1">
+              Total QTY
+            </div>
+            <div class="h6 mb-0 font-weight-bold text-gray-800">
+              {{ stats.total_qty|default:0|intcomma }}
+            </div>
+          </div>
+          <div class="col-auto">
+            <i class="bi bi-box-seam fa-2x text-gray-300"></i>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="card shadow mb-4">
+  <div class="card-header py-3 d-flex justify-content-between align-items-center">
+    <h6 class="m-0 font-weight-bold text-primary">
+      <i class="bi bi-list-ul me-2"></i>Transaction Records
+    </h6>
+    <div class="d-flex align-items-center">
+      <span class="me-3 text-muted small">
+        Page {{ page_obj.number }} of {{ paginator.num_pages }}
+      </span>
+    </div>
+  </div>
+  <div class="card-body">
+    {% if transactions %}
+    <div class="table-responsive">
+      <table class="table table-hover table-bordered" id="transactions-table" width="100%" cellspacing="0">
+        <thead class="table-light">
+          <tr>
+            <th>Invoice #</th>
+            <th>Date</th>
+            <th>Customer</th>
+            <th>Code</th>
+            <th>Description</th>
+            <th class="text-end">Qty</th>
+            <th class="text-end">Sales</th>
+            <th class="text-end">Paid</th>
+            <th class="text-end">Discount</th>
+            <th class="text-end">Total</th>
+            <th>Status</th>
+            <th class="text-center">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for tx in transactions %}
+          <tr class="transaction-row" data-id="{{ tx.id }}">
+            <td><strong class="text-primary">{{ tx.invoice_number }}</strong></td>
+            <td>{{ tx.date|date:"Y-m-d" }}</td>
+            <td>{{ tx.customer_name|default:"—" }}</td>
+            <td>{{ tx.code|default:"—" }}</td>
+            <td>{{ tx.item_description|default:"—"|truncatechars:30 }}</td>
+            <td class="text-end">{{ tx.qty|intcomma }}</td>
+            <td class="text-end">{{ tx.sales|floatformat:2|intcomma }}</td>
+            <td class="text-end">{{ tx.paid|floatformat:2|intcomma }}</td>
+            <td class="text-end">{{ tx.discount|floatformat:2|intcomma }}</td>
+            <td class="text-end fw-bold">AED {{ tx.total|floatformat:2|intcomma }}</td>
+            <td>
+              {% if tx.payment_status == 'paid' %}
+                <span class="badge bg-success">✓ PAID</span>
+              {% elif tx.payment_status == 'partial' %}
+                <span class="badge bg-warning">⨁ PARTIAL</span>
+              {% else %}
+                <span class="badge bg-danger">○ UNPAID</span>
+              {% endif %}
+            </td>
+            <td class="text-center">
+              <div class="btn-group">
+                <a href="{% url 'daily_sale:invoice' tx.id %}" class="btn btn-sm btn-outline-primary">
+                  <i class="bi bi-eye"></i>
+                </a>
+                <a href="{% url 'daily_sale:transaction_edit' tx.id %}" class="btn btn-sm btn-outline-secondary">
+                  <i class="bi bi-pencil"></i>
+                </a>
+                <a href="{% url 'daily_sale:transaction_delete' tx.id %}" class="btn btn-sm btn-outline-danger"
+                  onclick="return confirmDelete('{{ tx.invoice_number }}')">
+                  <i class="bi bi-trash"></i>
+                </a>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot class="table-light">
+          <tr class="fw-bold">
+            <td colspan="5" class="text-end">Grand Total:</td>
+            <td class="text-end">{{ stats.total_qty|default:0|intcomma }}</td>
+            <td class="text-end">AED {{ stats.total_sales|default:0|floatformat:2|intcomma }}</td>
+            <td class="text-end">AED {{ stats.total_paid|default:0|floatformat:2|intcomma }}</td>
+            <td class="text-end">AED {{ stats.total_discount|default:0|floatformat:2|intcomma }}</td>
+            <td class="text-end">AED {{ stats.net_total|default:0|floatformat:2|intcomma }}</td>
+            <td colspan="2"></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+    {% else %}
+    <div class="text-center py-5">
+      <div class="text-muted">
+        <i class="bi bi-receipt display-6 d-block mb-3"></i>
+        <h5>No transactions found</h5>
+        <p class="mb-0">No transactions match your filters</p>
+        <a href="{% url 'daily_sale:transaction_list' %}" class="btn btn-outline-primary mt-3">
+          <i class="bi bi-arrow-clockwise me-1"></i> Clear Filters
+        </a>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Pagination -->
+    {% if paginator.num_pages > 1 %}
+    <nav aria-label="Page navigation" class="mt-4">
+      <ul class="pagination justify-content-center">
+        {% if page_obj.has_previous %}
+        <li class="page-item">
+          <a class="page-link" href="?page=1&{{ request.GET.urlencode }}">
+            <i class="bi bi-chevron-double-left"></i>
+          </a>
+        </li>
+        <li class="page-item">
+          <a class="page-link" href="?page={{ page_obj.previous_page_number }}&{{ request.GET.urlencode }}">
+            <i class="bi bi-chevron-left"></i>
+          </a>
+        </li>
+        {% endif %}
+
+        <li class="page-item active">
+          <span class="page-link">{{ page_obj.number }} of {{ paginator.num_pages }}</span>
+        </li>
+
+        {% if page_obj.has_next %}
+        <li class="page-item">
+          <a class="page-link" href="?page={{ page_obj.next_page_number }}&{{ request.GET.urlencode }}">
+            <i class="bi bi-chevron-right"></i>
+          </a>
+        </li>
+        <li class="page-item">
+          <a class="page-link" href="?page={{ paginator.num_pages }}&{{ request.GET.urlencode }}">
+            <i class="bi bi-chevron-double-right"></i>
+          </a>
+        </li>
+        {% endif %}
+      </ul>
+    </nav>
+    {% endif %}
+  </div>
+</div>
+
+<div id="toast-container" class="position-fixed bottom-0 end-0 p-3" style="z-index: 11;"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function confirmDelete(invoice) {
+  return confirm(`Are you sure you want to delete transaction ${invoice}?`);
+}
+
+function showToast(message, type = 'success') {
+  const colors = {
+    success: '#28a745',
+    error: '#dc3545',
+    warning: '#ffc107',
+    info: '#17a2b8'
+  };
+  
+  const toastId = 'toast-' + Date.now();
+  const toastHtml = `
+    <div id="${toastId}" class="toast align-items-center text-white bg-${type}" role="alert" style="background-color: ${colors[type]} !important;">
+      <div class="d-flex">
+        <div class="toast-body">${message}</div>
+        <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+      </div>
+    </div>
+  `;
+  
+  $('#toast-container').append(toastHtml);
+  const toastElement = document.getElementById(toastId);
+  const toast = new bootstrap.Toast(toastElement, { autohide: true, delay: 3000 });
+  toast.show();
+  
+  toastElement.addEventListener('hidden.bs.toast', function () {
+    $(this).remove();
+  });
+}
+
+$(document).ready(function() {
+  // ===== Search functionality =====
+  $('#search-input').on('keyup', function() {
+    const searchTerm = $(this).val().toLowerCase();
+    const hasSearch = searchTerm.length > 0;
+    $('#clear-search').toggle(hasSearch);
+    
+    $('.transaction-row').each(function() {
+      const text = $(this).text().toLowerCase();
+      $(this).toggle(text.includes(searchTerm));
+    });
+  });
+  
+  $('#clear-search').on('click', function() {
+    $('#search-input').val('').trigger('keyup');
+  });
+  
+  // ===== Filter badges =====
+  $('.filter-badge').on('click', function() {
+    const filter = $(this).data('filter');
+    $('.filter-badge').removeClass('active');
+    $(this).addClass('active');
+    
+    const today = new Date();
+    
+    if (filter === 'today') {
+      const date = today.toISOString().split('T')[0];
+      window.location.href = `?start_date=${date}&end_date=${date}`;
+    } else if (filter === 'week') {
+      const start = new Date(today);
+      start.setDate(today.getDate() - today.getDay());
+      const end = new Date(start);
+      end.setDate(start.getDate() + 6);
+      window.location.href = `?start_date=${start.toISOString().split('T')[0]}&end_date=${end.toISOString().split('T')[0]}`;
+    } else if (filter === 'month') {
+      const start = new Date(today.getFullYear(), today.getMonth(), 1);
+      const end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      window.location.href = `?start_date=${start.toISOString().split('T')[0]}&end_date=${end.toISOString().split('T')[0]}`;
+    } else {
+      window.location.href = `?payment_status=${filter}`;
+    }
+  });
+});
+</script>
+
+<style>
+.filter-badge {
+  cursor: pointer;
+  padding: 5px 12px;
+  margin: 0 3px;
+  border-radius: 20px;
+  background: #f0f0f0;
+  font-size: 12px;
+  transition: all 0.2s;
+}
+.filter-badge:hover, .filter-badge.active {
+  background: #007bff;
+  color: white;
+}
+.search-box {
+  position: relative;
+}
+.search-box .clear-search {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: pointer;
+  font-size: 18px;
+}
+.table th, .table td {
+  vertical-align: middle;
+  font-size: 13px;
+}
+.badge {
+  font-size: 11px;
+  padding: 4px 8px;
+}
+</style>
+{% endblock %}

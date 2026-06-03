@@ -1,0 +1,208 @@
+{% extends "daily_sale/daily_sale_base.html" %}
+{% load static %}
+{% load humanize %}
+
+{% block title %}Almuqbil | Daily Summary{% endblock %}
+
+{% block content %}
+<div class="summary-wrapper">
+    
+    <div class="excel-menu">
+        <a href="{% url 'daily_sale:transaction_list' %}" class="menu-item">🏠 Home</a>
+        <a href="{% url 'daily_sale:transaction_create' %}" class="menu-item">📊 Daily Sales</a>
+        <a href="{% url 'daily_sale:daily_summary' %}" class="menu-item active">📈 Daily Summary</a>
+    </div>
+    
+    <div class="excel-container">
+        
+        <!-- نویگیشن تاریخ -->
+        <div class="date-navigation">
+            <a href="?date={{ prev_date|date:'Y-m-d' }}" class="nav-arrow">◀ Previous Day</a>
+            <span class="current-date">{{ selected_date|date:"l, F j, Y" }}</span>
+            {% if next_date <= today %}
+            <a href="?date={{ next_date|date:'Y-m-d' }}" class="nav-arrow">Next Day ▶</a>
+            {% else %}
+            <span class="nav-arrow disabled">Next Day ▶</span>
+            {% endif %}
+        </div>
+        
+        <!-- ========== باکس اصلی (مثل تصویر کارفرما) ========== -->
+        <div class="code-summary-box">
+            <div class="box-header">
+                <h3>📊 Sales Summary by Code</h3>
+                <span class="box-date">{{ selected_date|date:"F j, Y" }}</span>
+            </div>
+            
+            <table class="code-table" id="code-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Code</th>
+                        <th>Product Name</th>
+                        <th>Container</th>
+                        <th>Total (AED)</th>
+                        <th>QTY</th>
+                        <th>Not Sold</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in code_summaries %}
+                    <tr class="code-row {% if selected_code == item.code %}selected{% endif %}" 
+                        data-code="{{ item.code }}"
+                        onclick="window.location.href='?date={{ selected_date|date:'Y-m-d' }}&code={{ item.code }}'">
+                        <td>{{ item.date|date:"F j" }}</td>
+                        <td><strong class="code-link">{{ item.code }}</strong></td>
+                        <td>{{ item.product_name|default:"-"|truncatechars:30 }}</td>
+                        <td>{{ item.container_number|default:"-" }}</td>
+                        <td class="text-right">{{ item.net_total|floatformat:0|intcomma }}</td>
+                        <td class="text-center">{{ item.total_qty }}</td>
+                        <td class="text-center {% if item.not_sold > 0 %}warning{% endif %}">{{ item.not_sold }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center">No data available for this date</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot class="total-row">
+                    <tr>
+                        <td colspan="4"><strong>GRAND TOTAL</strong></td>
+                        <td class="text-right"><strong>{{ grand_total|floatformat:0|intcomma }}</strong></td>
+                        <td class="text-center"><strong>{{ code_summaries|sum_attr:"total_qty" }}</strong></td>
+                        <td class="text-center"><strong>{{ total_not_sold }}</strong></td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        
+        <!-- ========== بخش جزئیات کد انتخاب شده (بعد از کلیک) ========== -->
+        {% if selected_summary %}
+        <div class="code-details">
+            <div class="details-header">
+                <h3>🔍 Details for Code: <span class="highlight-code">{{ selected_code }}</span></h3>
+                <button class="close-details" onclick="window.location.href='?date={{ selected_date|date:'Y-m-d' }}'">✕</button>
+            </div>
+            
+            <!-- اطلاعات کلی کد -->
+            <div class="info-grid">
+                <div class="info-card">
+                    <div class="info-label">Product Name</div>
+                    <div class="info-value">{{ selected_summary.product_name|default:"-" }}</div>
+                </div>
+                <div class="info-card">
+                    <div class="info-label">Container</div>
+                    <div class="info-value">{{ selected_summary.container_number|default:"-" }}</div>
+                </div>
+                <div class="info-card">
+                    <div class="info-label">Total Sales</div>
+                    <div class="info-value">{{ selected_summary.total_sales|floatformat:0|intcomma }} AED</div>
+                </div>
+                <div class="info-card">
+                    <div class="info-label">Discount</div>
+                    <div class="info-value">{{ selected_summary.total_discount|floatformat:0|intcomma }} AED</div>
+                </div>
+                <div class="info-card">
+                    <div class="info-label">Net Total</div>
+                    <div class="info-value total">{{ selected_summary.net_total|floatformat:0|intcomma }} AED</div>
+                </div>
+                <div class="info-card">
+                    <div class="info-label">Paid</div>
+                    <div class="info-value">{{ selected_summary.total_paid|floatformat:0|intcomma }} AED</div>
+                </div>
+                <div class="info-card">
+                    <div class="info-label">Total QTY</div>
+                    <div class="info-value">{{ selected_summary.total_qty }}</div>
+                </div>
+                <div class="info-card">
+                    <div class="info-label">Transactions</div>
+                    <div class="info-value">{{ selected_summary.transaction_count }}</div>
+                </div>
+            </div>
+            
+            <!-- لیست تراکنش‌های آن کد -->
+            {% if code_transactions %}
+            <div class="transactions-list">
+                <h4>📋 Transactions for {{ selected_code }}</h4>
+                <table class="transactions-table">
+                    <thead>
+                        <tr>
+                            <th>Invoice</th>
+                            <th>Customer</th>
+                            <th>QTY</th>
+                            <th>Unit Price</th>
+                            <th>Sales</th>
+                            <th>Discount</th>
+                            <th>Total</th>
+                            <th>Paid</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for tx in code_transactions %}
+                        <tr>
+                            <td>{{ tx.invoice_number }}</td>
+                            <td>{{ tx.customer_name|default:"-" }}</td>
+                            <td class="text-center">{{ tx.qty }}</td>
+                            <td class="text-right">{{ tx.sales|floatformat:2 }}</td>
+                            <td class="text-right">{{ tx.sales|floatformat:2 }}</td>
+                            <td class="text-right">{{ tx.discount|floatformat:2 }}</td>
+                            <td class="text-right">{{ tx.total|floatformat:2 }}</td>
+                            <td class="text-right">{{ tx.paid|floatformat:2 }}</td>
+                            <td class="text-center">
+                                {% if tx.payment_status == 'paid' %}
+                                <span class="badge-paid">✓</span>
+                                {% elif tx.payment_status == 'partial' %}
+                                <span class="badge-partial">⨁</span>
+                                {% else %}
+                                <span class="badge-unpaid">○</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% endif %}
+        </div>
+        {% endif %}
+        
+        <!-- آمار روزانه -->
+        <div class="daily-stats">
+            <div class="stat-item">
+                <span class="stat-label">Daily Sales:</span>
+                <span class="stat-value">{{ daily_stats.total_sales|default:0|floatformat:0|intcomma }} AED</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Daily Discount:</span>
+                <span class="stat-value">{{ daily_stats.total_discount|default:0|floatformat:0|intcomma }} AED</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Daily Paid:</span>
+                <span class="stat-value">{{ daily_stats.total_paid|default:0|floatformat:0|intcomma }} AED</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-label">Transactions:</span>
+                <span class="stat-value">{{ daily_stats.transaction_count|default:0 }}</span>
+            </div>
+        </div>
+        
+        <div class="excel-statusbar">
+            <span>✅ Click on any code to see details</span>
+            <span>🕒 <span id="current-time"></span></span>
+            <span>📅 {{ selected_date|date:"m/d/Y" }}</span>
+        </div>
+        
+    </div>
+</div>
+
+<script>
+function updateTime() {
+    const now = new Date();
+    document.getElementById('current-time').textContent = 
+        now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+}
+updateTime();
+setInterval(updateTime, 60000);
+</script>
+
+{% endblock %}
